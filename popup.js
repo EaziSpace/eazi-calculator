@@ -1,4 +1,4 @@
-const chatMessages = document.getElementById('chatMessages');
+const historyContainer = document.getElementById('historyContainer');
 const chatInput = document.getElementById('chatInput');
 const STORAGE_KEY = 'eazi-calculator-history';
 const LAST_RESULT_KEY = 'eazi-calculator-last-result';
@@ -73,46 +73,96 @@ function formatNumber(num) {
 }
 
 function addMessage(content, isUser = false, isError = false) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}${isError ? ' error-message' : ''}`;
-
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-
-    if (!isUser && !isError) {
-        contentDiv.classList.add('calculation-result');
-    }
-
-    contentDiv.innerHTML = content;
-    messageDiv.appendChild(contentDiv);
-
     if (isUser && !isError && content.includes('=')) {
-        contentDiv.style.cursor = 'pointer';
-        contentDiv.addEventListener('click', function() {
-            const match = content.match(/^(.+?)\s*=\s*([0-9.-]+)$/);
-            if (match) {
-                chatInput.value = match[1].trim();
-                chatInput.focus();
-            }
-        });
-    }
+        addCalculationCard(content);
+    } else if (isError) {
+        addErrorMessage(content);
+    } else {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}${isError ? ' error-message' : ''}`;
 
-    chatMessages.appendChild(messageDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+
+        if (!isUser && !isError) {
+            contentDiv.classList.add('calculation-result');
+        }
+
+        contentDiv.innerHTML = content;
+        messageDiv.appendChild(contentDiv);
+
+        historyContainer.appendChild(messageDiv);
+        historyContainer.scrollTop = historyContainer.scrollHeight;
+    }
     
     saveHistory();
 }
 
+function addCalculationCard(calculation) {
+    const match = calculation.match(/^(.+?)\s*=\s*([0-9.-]+)$/);
+    if (!match) return;
+
+    const expression = match[1].trim();
+    const result = match[2].trim();
+
+    const cardDiv = document.createElement('div');
+    cardDiv.className = 'calculation-card';
+
+    const expressionDiv = document.createElement('div');
+    expressionDiv.className = 'calculation-expression';
+    expressionDiv.textContent = expression;
+
+    const resultDiv = document.createElement('div');
+    resultDiv.className = 'calculation-result';
+    resultDiv.textContent = result;
+
+    cardDiv.appendChild(expressionDiv);
+    cardDiv.appendChild(resultDiv);
+
+    cardDiv.addEventListener('click', function() {
+        chatInput.value = expression;
+        chatInput.focus();
+    });
+
+    historyContainer.appendChild(cardDiv);
+    historyContainer.scrollTop = historyContainer.scrollHeight;
+}
+
+function addErrorMessage(content) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message bot-message error-message';
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    contentDiv.innerHTML = content;
+
+    messageDiv.appendChild(contentDiv);
+    historyContainer.appendChild(messageDiv);
+    historyContainer.scrollTop = historyContainer.scrollHeight;
+}
+
 function saveHistory() {
     const messages = [];
-    const messageElements = chatMessages.querySelectorAll('.message:not(.welcome-message .message)');
+    const messageElements = historyContainer.querySelectorAll('.message:not(.welcome-message .message)');
+    const cardElements = historyContainer.querySelectorAll('.calculation-card');
     
     messageElements.forEach(messageEl => {
         const content = messageEl.querySelector('.message-content').innerHTML;
         const isUser = messageEl.classList.contains('user-message');
         const isError = messageEl.classList.contains('error-message');
         
-        messages.push({ content, isUser, isError });
+        messages.push({ content, isUser, isError, type: 'message' });
+    });
+    
+    cardElements.forEach(cardEl => {
+        const expression = cardEl.querySelector('.calculation-expression').textContent;
+        const result = cardEl.querySelector('.calculation-result').textContent;
+        
+        messages.push({ 
+            expression: expression, 
+            result: result, 
+            type: 'card' 
+        });
     });
     
     localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
@@ -124,7 +174,17 @@ function loadHistory() {
         if (saved) {
             const messages = JSON.parse(saved);
             messages.forEach(msg => {
-                addMessageWithoutSaving(msg.content, msg.isUser, msg.isError);
+                if (msg.type === 'card') {
+                    addCalculationCardDirectly(msg.expression, msg.result);
+                } else if (msg.isUser && msg.content && msg.content.includes('=')) {
+                    // Handle old format calculations
+                    const match = msg.content.match(/^(.+?)\s*=\s*([0-9.-]+)$/);
+                    if (match) {
+                        addCalculationCardDirectly(match[1].trim(), match[2].trim());
+                    }
+                } else if (!msg.isUser || msg.isError) {
+                    addMessageWithoutSaving(msg.content, msg.isUser, msg.isError);
+                }
             });
         }
     } catch (e) {
@@ -146,19 +206,42 @@ function addMessageWithoutSaving(content, isUser = false, isError = false) {
     contentDiv.innerHTML = content;
     messageDiv.appendChild(contentDiv);
 
-    if (isUser && !isError && content.includes('=')) {
-        contentDiv.style.cursor = 'pointer';
-        contentDiv.addEventListener('click', function() {
-            const match = content.match(/^(.+?)\s*=\s*([0-9.-]+)$/);
-            if (match) {
-                chatInput.value = match[1].trim();
-                chatInput.focus();
-            }
-        });
-    }
+    historyContainer.appendChild(messageDiv);
+    historyContainer.scrollTop = historyContainer.scrollHeight;
+}
 
-    chatMessages.appendChild(messageDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+function addCalculationCardWithoutSaving(calculation) {
+    const match = calculation.match(/^(.+?)\s*=\s*([0-9.-]+)$/);
+    if (!match) return;
+
+    const expression = match[1].trim();
+    const result = match[2].trim();
+
+    addCalculationCardDirectly(expression, result);
+}
+
+function addCalculationCardDirectly(expression, result) {
+    const cardDiv = document.createElement('div');
+    cardDiv.className = 'calculation-card';
+
+    const expressionDiv = document.createElement('div');
+    expressionDiv.className = 'calculation-expression';
+    expressionDiv.textContent = expression;
+
+    const resultDiv = document.createElement('div');
+    resultDiv.className = 'calculation-result';
+    resultDiv.textContent = result;
+
+    cardDiv.appendChild(expressionDiv);
+    cardDiv.appendChild(resultDiv);
+
+    cardDiv.addEventListener('click', function() {
+        chatInput.value = expression;
+        chatInput.focus();
+    });
+
+    historyContainer.appendChild(cardDiv);
+    historyContainer.scrollTop = historyContainer.scrollHeight;
 }
 
 function sendMessage() {
@@ -197,22 +280,23 @@ function sendMessage() {
 }
 
 function getLastResultBeforeThis() {
-    const messages = chatMessages.querySelectorAll('.message.user-message:not(.error-message)');
-    if (messages.length === 0) return null;
+    const cards = historyContainer.querySelectorAll('.calculation-card');
+    if (cards.length === 0) return null;
     
-    for (let i = messages.length - 1; i >= 0; i--) {
-        const content = messages[i].querySelector('.message-content').innerHTML;
-        const match = content.match(/=\s*([0-9.-]+)$/);
-        if (match) {
-            return parseFloat(match[1]);
+    for (let i = cards.length - 1; i >= 0; i--) {
+        const resultText = cards[i].querySelector('.calculation-result').textContent;
+        if (resultText) {
+            return parseFloat(resultText);
         }
     }
     return null;
 }
 
 function clearChat() {
-    const messages = chatMessages.querySelectorAll('.message:not(.welcome-message .message)');
+    const messages = historyContainer.querySelectorAll('.message:not(.welcome-message .message)');
+    const cards = historyContainer.querySelectorAll('.calculation-card');
     messages.forEach(message => message.remove());
+    cards.forEach(card => card.remove());
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(LAST_RESULT_KEY);
     lastResult = null;

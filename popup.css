@@ -8,12 +8,12 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: #f0f2f5;
     margin: 0;
-    height: 100vh;
+    height: 500px;
 }
 
 .chat-calculator {
     width: 450px;
-    height: 100vh;
+    height: 500px;
     background: white;
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
@@ -60,14 +60,14 @@ body {
     background: rgba(255, 255, 255, 0.3);
 }
 
-.chat-messages {
+.history-container {
     flex: 1;
-    padding: 4px 6px;
+    padding: 12px;
     overflow-y: auto;
     background: #f8f9fa;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 8px;
 }
 
 .message {
@@ -189,6 +189,81 @@ body {
     border-radius: 2px;
 }
 
-.chat-messages::-webkit-scrollbar-thumb:hover {
+.history-container::-webkit-scrollbar-thumb:hover {
     background: #95a5a6;
+}
+
+.calculation-card {
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    border: 1px solid #d1d5db;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    min-height: fit-content;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.calculation-card:hover {
+    transform: scale(1.01);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-color: #9ca3af;
+}
+
+.calculation-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.calculation-card:hover::before {
+    opacity: 1;
+}
+
+.calculation-expression {
+    font-size: 13px;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 6px;
+    line-height: 1.4;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.calculation-result {
+    font-size: 15px;
+    font-weight: 700;
+    color: #f97316;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    line-height: 1.2;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.calculation-result::before {
+    content: '= ';
+    color: #374151;
+    font-weight: 500;
+}
+
+.history-container::-webkit-scrollbar {
+    width: 4px;
+}
+
+.history-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.history-container::-webkit-scrollbar-thumb {
+    background: #bdc3c7;
+    border-radius: 2px;
 }
