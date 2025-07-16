@@ -2,6 +2,7 @@ const historyContainer = document.getElementById('historyContainer');
 const chatInput = document.getElementById('chatInput');
 const STORAGE_KEY = 'eazi-calculator-history';
 const LAST_RESULT_KEY = 'eazi-calculator-last-result';
+const INPUT_TEXT_KEY = 'eazi-calculator-input-text';
 let lastResult = null;
 
 // Debug mode toggle
@@ -276,6 +277,7 @@ function sendMessage() {
     }
 
     chatInput.value = '';
+    localStorage.removeItem(INPUT_TEXT_KEY); // Clear saved input after sending
     chatInput.focus();
 }
 
@@ -308,6 +310,10 @@ chatInput.addEventListener('keydown', function(event) {
         sendMessage();
         event.preventDefault();
     }
+});
+
+chatInput.addEventListener('input', function() {
+    saveInputText();
 });
 
 document.getElementById('sendButton').addEventListener('click', sendMessage);
@@ -518,6 +524,26 @@ function loadLastResult() {
     }
 }
 
+function saveInputText() {
+    try {
+        localStorage.setItem(INPUT_TEXT_KEY, chatInput.value);
+    } catch (e) {
+        console.log('Error saving input text:', e);
+    }
+}
+
+function loadInputText() {
+    try {
+        const saved = localStorage.getItem(INPUT_TEXT_KEY);
+        if (saved) {
+            chatInput.value = saved;
+        }
+    } catch (e) {
+        console.log('Error loading input text:', e);
+    }
+}
+
+
 // Test cases for calculator
 const testCases = [
     // Basic operations
@@ -649,6 +675,7 @@ function addDebugButton() {
 window.addEventListener('load', function() {
     loadHistory();
     loadLastResult();
+    loadInputText();
     chatInput.focus();
     
     // Add development buttons (uncomment for development)

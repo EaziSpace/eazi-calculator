@@ -8,12 +8,12 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: #f0f2f5;
     margin: 0;
-    height: 500px;
+    height: 100vh;
 }
 
 .chat-calculator {
-    width: 450px;
-    height: 500px;
+    width: 360px;
+    height: 100vh;
     background: white;
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
@@ -26,7 +26,7 @@ body {
 .chat-header {
     background: linear-gradient(135deg, #4267B2 0%, #365899 100%);
     color: white;
-    padding: 6px 8px;
+    padding: 3px 8px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -38,7 +38,7 @@ body {
     align-items: center;
     gap: 8px;
     font-weight: 600;
-    font-size: 16px;
+    font-size: 14px;
 }
 
 .calculator-icon {
@@ -62,12 +62,11 @@ body {
 
 .history-container {
     flex: 1;
-    padding: 12px;
+    padding: 6px;
     overflow-y: auto;
     background: #f8f9fa;
     display: flex;
     flex-direction: column;
-    gap: 8px;
 }
 
 .message {
@@ -124,7 +123,6 @@ body {
 }
 
 .chat-input-container {
-    padding: 4px 6px 3px 6px;
     background: white;
     border-top: 1px solid #e4e6ea;
 }
@@ -133,7 +131,6 @@ body {
     display: flex;
     align-items: center;
     background: #f0f2f5;
-    border-radius: 12px;
     padding: 3px 6px;
     gap: 3px;
 }
@@ -194,11 +191,8 @@ body {
 }
 
 .calculation-card {
-    border-radius: 12px;
-    padding: 12px 16px;
+    padding: 1px 1px;
     margin-bottom: 8px;
-    border: 1px solid #d1d5db;
-    transition: all 0.3s ease;
     cursor: pointer;
     position: relative;
     overflow: hidden;
@@ -209,41 +203,24 @@ body {
 
 .calculation-card:hover {
     transform: scale(1.01);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    border-color: #9ca3af;
 }
 
-.calculation-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.calculation-card:hover::before {
-    opacity: 1;
-}
 
 .calculation-expression {
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 500;
     color: #374151;
-    margin-bottom: 6px;
     line-height: 1.4;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    font-family: 'Segoe UI', sans-serif;
 }
 
 .calculation-result {
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 700;
-    color: #f97316;
-    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    color: #4267B2;
+    font-family: 'Segoe UI', sans-serif;
     line-height: 1.2;
     word-wrap: break-word;
     overflow-wrap: break-word;
