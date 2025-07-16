@@ -4,40 +4,72 @@ const STORAGE_KEY = 'eazi-calculator-history';
 const LAST_RESULT_KEY = 'eazi-calculator-last-result';
 let lastResult = null;
 
+// Debug mode toggle
+let DEBUG_MODE = false;
+
+function debug(...args) {
+    if (DEBUG_MODE) {
+        console.log('🐛 DEBUG:', ...args);
+    }
+}
+
+function toggleDebug() {
+    DEBUG_MODE = !DEBUG_MODE;
+    console.log(`🔧 Debug mode: ${DEBUG_MODE ? 'ON' : 'OFF'}`);
+    return DEBUG_MODE;
+}
+
 function evaluateExpression(expression) {
+    debug('evaluateExpression called with:', expression);
+    
     try {
         if (!expression || expression.trim() === '') {
+            debug('Empty expression, returning null');
             return null;
         }
 
+        const originalExpression = expression;
         expression = expression.replace(/×/g, '*')
                               .replace(/÷/g, '/')
                               .replace(/:/g, '/')
                               .replace(/\s+/g, '');
         
+        debug('After symbol replacement:', expression);
+        
         if (/^[+\-*/]/.test(expression) && lastResult !== null) {
             expression = 'x' + expression;
+            debug('Auto-prepended x:', expression);
         }
         
         if (expression.includes('x') && lastResult !== null) {
+            const beforeX = expression;
             expression = expression.replace(/x/g, lastResult.toString());
+            debug('Replaced x with lastResult:', beforeX, '->', expression);
         } else if (expression.includes('x') && lastResult === null) {
+            debug('Expression contains x but no lastResult, returning null');
             return null;
         }
 
-        if (!/^[0-9+\-*/.]+$/.test(expression)) {
+        if (!/^[0-9+\-*/.()]+$/.test(expression)) {
+            debug('Invalid characters in expression, returning null');
             return null;
         }
 
-        return calculateExpression(expression);
+        debug('About to calculate:', expression);
+        const result = calculateExpression(expression);
+        debug('Calculation result:', result);
+        
+        return result;
     } catch (e) {
-        console.log(`evaluateExpression: ${e}`);
+        debug(`evaluateExpression error: ${e}`);
         return null;
     }
 }
 
 function formatNumber(num) {
-    return num.toString();
+    // Round to 12 decimal places to avoid floating point precision issues
+    const rounded = Math.round(num * 1000000000000) / 1000000000000;
+    return rounded.toString();
 }
 
 function addMessage(content, isUser = false, isError = false) {
@@ -157,7 +189,7 @@ function sendMessage() {
         addMessage(`${displayExpression} = ${formatNumber(result)}`, true);
     } else {
         addMessage(`${expression}`, true);
-        addMessage('Lỗi: Phép tính không hợp lệ', false, true);
+        addMessage('Error: Invalid calculation', false, true);
     }
 
     chatInput.value = '';
@@ -198,51 +230,137 @@ document.getElementById('sendButton').addEventListener('click', sendMessage);
 document.getElementById('clearButton').addEventListener('click', clearChat);
 
 function calculateExpression(expr) {
+    debug('calculateExpression called with:', expr);
+    
     try {
         let operators = [];
         let operands = [];
         let currentNumber = '';
         
+        debug('Starting tokenization...');
+        
         for (let i = 0; i < expr.length; i++) {
             const char = expr[i];
+            debug(`Processing char '${char}' at position ${i}`);
             
             if (char >= '0' && char <= '9' || char === '.') {
                 currentNumber += char;
-            } else if (['+', '-', '*', '/'].includes(char)) {
-                if (currentNumber === '') {
-                    if (char === '-' && operands.length === 0) {
-                        currentNumber = '-';
-                        continue;
+                debug(`Building number: '${currentNumber}'`);
+            } else if (char === '(') {
+                if (currentNumber !== '') {
+                    if (currentNumber === '-') {
+                        // Special case: -(expression) = -1 * (expression)
+                        operands.push(-1);
+                        operators.push('*');
+                        debug(`Added -1 * for negative expression`);
+                    } else {
+                        // Only add implicit multiply if we have a number before (
+                        // Examples: 2(3+4) should become 2*(3+4)
+                        operands.push(parseFloat(currentNumber));
+                        operators.push('*');
+                        debug(`Added operand: ${currentNumber}, implicit multiply`);
                     }
-                    return null;
+                    currentNumber = '';
+                }
+                operators.push('(');
+                debug(`Added opening parenthesis`);
+            } else if (char === ')') {
+                if (currentNumber !== '') {
+                    operands.push(parseFloat(currentNumber));
+                    debug(`Added operand: ${currentNumber}`);
+                    currentNumber = '';
                 }
                 
-                operands.push(parseFloat(currentNumber));
-                currentNumber = '';
+                debug(`Processing closing parenthesis, operators: [${operators.join(', ')}]`);
+                
+                while (operators.length > 0 && operators[operators.length - 1] !== '(') {
+                    debug(`Performing operation while closing parenthesis`);
+                    const result = performOperation(operands, operators);
+                    if (result === null) return null;
+                }
+                
+                if (operators.length === 0) {
+                    debug(`No matching opening parenthesis found`);
+                    return null;
+                }
+                operators.pop();
+                debug(`Removed opening parenthesis`);
+                
+                // No implicit multiplication after closing parenthesis
+                // Let explicit operators handle themselves
+            } else if (['+', '-', '*', '/'].includes(char)) {
+                if (currentNumber === '') {
+                    // Allow negative numbers ONLY at start, after (, or after operators (not after operands)
+                    if (char === '-') {
+                        const lastOp = operators[operators.length - 1];
+                        // Only allow negative number if we don't have multiple operands waiting
+                        if ((operands.length === 0 || lastOp === '(' || 
+                            lastOp === '+' || lastOp === '-' || lastOp === '*' || lastOp === '/') &&
+                            !(operands.length > 1 && operators.length < operands.length)) {
+                            currentNumber = '-';
+                            debug(`Starting negative number`);
+                            continue;
+                        }
+                    }
+                    
+                    // Check if we have operands to work with (valid after closing parenthesis)
+                    if (operands.length === 0) {
+                        debug(`Invalid operator placement: ${char}`);
+                        return null;
+                    }
+                    
+                    // Valid operator after operands (e.g., after closing parenthesis)
+                    debug(`Valid operator after operands: ${char}`);
+                } else {
+                    // We have a currentNumber to push
+                    operands.push(parseFloat(currentNumber));
+                    debug(`Added operand: ${currentNumber}`);
+                    currentNumber = '';
+                }
+                
+                debug(`Processing operator '${char}', current operators: [${operators.join(', ')}]`);
                 
                 while (operators.length > 0 && 
+                       operators[operators.length - 1] !== '(' &&
                        getPrecedence(operators[operators.length - 1]) >= getPrecedence(char)) {
+                    debug(`Performing operation due to precedence`);
                     const result = performOperation(operands, operators);
                     if (result === null) return null;
                 }
                 
                 operators.push(char);
+                debug(`Added operator: ${char}`);
             } else {
+                debug(`Invalid character: ${char}`);
                 return null;
             }
+            
+            debug(`Current state - operands: [${operands.join(', ')}], operators: [${operators.join(', ')}]`);
         }
         
         if (currentNumber !== '') {
             operands.push(parseFloat(currentNumber));
+            debug(`Added final operand: ${currentNumber}`);
         }
         
+        debug(`Final processing - operands: [${operands.join(', ')}], operators: [${operators.join(', ')}]`);
+        
         while (operators.length > 0) {
+            if (operators[operators.length - 1] === '(') {
+                debug(`Unmatched opening parenthesis`);
+                return null;
+            }
+            debug(`Performing final operation`);
             const result = performOperation(operands, operators);
             if (result === null) return null;
         }
         
-        return operands.length === 1 ? operands[0] : null;
+        const finalResult = operands.length === 1 ? operands[0] : null;
+        debug(`Final result: ${finalResult}`);
+        
+        return finalResult;
     } catch (e) {
+        debug(`calculateExpression error: ${e}`);
         return null;
     }
 }
@@ -261,13 +379,19 @@ function getPrecedence(operator) {
 }
 
 function performOperation(operands, operators) {
+    debug('performOperation called');
+    debug(`Before operation - operands: [${operands.join(', ')}], operators: [${operators.join(', ')}]`);
+    
     if (operands.length < 2 || operators.length === 0) {
+        debug('Not enough operands or operators');
         return null;
     }
     
     const b = operands.pop();
     const a = operands.pop();
     const op = operators.pop();
+    
+    debug(`Performing: ${a} ${op} ${b}`);
     
     let result;
     switch (op) {
@@ -281,14 +405,21 @@ function performOperation(operands, operators) {
             result = a * b;
             break;
         case '/':
-            if (b === 0) return null;
+            if (b === 0) {
+                debug('Division by zero detected');
+                return null;
+            }
             result = a / b;
             break;
         default:
+            debug(`Unknown operator: ${op}`);
             return null;
     }
     
+    debug(`Operation result: ${result}`);
     operands.push(result);
+    debug(`After operation - operands: [${operands.join(', ')}], operators: [${operators.join(', ')}]`);
+    
     return result;
 }
 
@@ -303,8 +434,140 @@ function loadLastResult() {
     }
 }
 
+// Test cases for calculator
+const testCases = [
+    // Basic operations
+    { input: '2+3', expected: 5 },
+    { input: '10-4', expected: 6 },
+    { input: '6*7', expected: 42 },
+    { input: '15/3', expected: 5 },
+    
+    // Operator precedence
+    { input: '2+3*4', expected: 14 },
+    { input: '10-6/2', expected: 7 },
+    { input: '2*3+4', expected: 10 },
+    { input: '8/2-1', expected: 3 },
+    
+    // Parentheses
+    { input: '(2+3)*4', expected: 20 },
+    { input: '10/(2+3)', expected: 2 },
+    { input: '(10-5)*(3+2)', expected: 25 },
+    { input: '2*(3+4)', expected: 14 },
+    
+    // Decimals
+    { input: '0.1+0.2', expected: 0.3 },
+    { input: '1.5*2', expected: 3 },
+    { input: '7.5/2.5', expected: 3 },
+    
+    // Negative numbers
+    { input: '-5+3', expected: -2 },
+    { input: '-(2+3)', expected: -5 },
+    { input: '10*-2', expected: -20 },
+    { input: '-1*5', expected: -5 },
+    { input: '3+-2', expected: 1 },
+    
+    // Complex expressions
+    { input: '(2+3)*(4-1)', expected: 15 },
+    { input: '10/(2+3)-1', expected: 1 },
+    { input: '2+(3*4)-5', expected: 9 },
+    { input: '(1+5)*2', expected: 12 },
+    { input: '3*(2+4)', expected: 18 },
+    
+    // Edge cases
+    { input: '0*5', expected: 0 },
+    { input: '0/5', expected: 0 },
+    { input: '5-5', expected: 0 },
+];
+
+function runTests() {
+    console.log('🧪 Running Calculator Tests...');
+    
+    let passed = 0;
+    let failed = 0;
+    
+    testCases.forEach((test, index) => {
+        const result = evaluateExpression(test.input);
+        const expected = test.expected;
+        
+        // Handle floating point comparison and null results
+        const isEqual = result !== null && Math.abs(result - expected) < 1e-10;
+        
+        if (isEqual) {
+            console.log(`✅ Test ${index + 1}: ${test.input} = ${result} (expected: ${expected})`);
+            passed++;
+        } else {
+            console.log(`❌ Test ${index + 1}: ${test.input} = ${result} (expected: ${expected})`);
+            failed++;
+            
+            // Quick debug for specific failed cases
+            if (test.input === '10/(2+3)-1' || test.input === '2+(3*4)-5') {
+                console.log(`🔍 Debug trace for ${test.input}:`);
+                const oldDebug = DEBUG_MODE;
+                DEBUG_MODE = true;
+                evaluateExpression(test.input);
+                DEBUG_MODE = oldDebug;
+            }
+        }
+    });
+    
+    console.log(`\n📊 Test Results: ${passed} passed, ${failed} failed`);
+    
+    if (failed === 0) {
+        console.log('🎉 All tests passed!');
+    } else {
+        console.log(`⚠️  ${failed} test(s) failed`);
+    }
+    
+    return { passed, failed };
+}
+
+// Add test and debug buttons in development
+function addTestButton() {
+    const testButton = document.createElement('button');
+    testButton.textContent = 'Test';
+    testButton.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        padding: 5px 10px;
+        background: #28a745;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        z-index: 9999;
+        font-size: 12px;
+    `;
+    testButton.onclick = runTests;
+    document.body.appendChild(testButton);
+}
+
+function addDebugButton() {
+    const debugButton = document.createElement('button');
+    debugButton.textContent = 'Debug';
+    debugButton.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 70px;
+        padding: 5px 10px;
+        background: #ffc107;
+        color: black;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        z-index: 9999;
+        font-size: 12px;
+    `;
+    debugButton.onclick = toggleDebug;
+    document.body.appendChild(debugButton);
+}
+
 window.addEventListener('load', function() {
     loadHistory();
     loadLastResult();
     chatInput.focus();
+    
+    // Add development buttons (uncomment for development)
+    // addTestButton();
+    // addDebugButton();
 });
